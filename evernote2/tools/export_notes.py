@@ -2,16 +2,23 @@ import os
 import shutil
 import csv
 import math
+import time
+import json
+import copy
+import mimetypes
 
 from optparse import OptionParser
 
 from evernote2.api.client import EvernoteClient
 from evernote2.edam.notestore.ttypes import NoteFilter, NotesMetadataResultSpec
 from evernote2.edam.type.ttypes import NoteSortOrder
+from evernote2.edam.error.ttypes import EDAMSystemException, EDAMErrorCode
 
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s | %(levelname)s | %(message)s")
+
+enex_file_basename = 'index.enex'
 
 
 def main():
@@ -22,7 +29,7 @@ def main():
     parser.add_option('-s', '--sandbox', dest='is_sandbox', help='use sandbox', action='store_true', default=False)
     parser.add_option('-c', '--china', dest='is_china', help='use yinxiang.com instead of evernote.com', action='store_true', default=False)
     parser.add_option('-f', '--force-delete', dest='is_force_delete', help='delete output_dir if exists', action='store_true', default=False)
-    parser.add_option('-m', '--max-notes-count', dest='max_notes_count', help='max notes count to download', default=10000)
+    parser.add_option('-m', '--max-notes-count', dest='max_notes_count', help='max notes count to download', default='10000')
 
     (options, args) = parser.parse_args()
 
@@ -31,7 +38,7 @@ def main():
     is_sandbox = options.is_sandbox
     is_china = options.is_china
     is_force_delete = options.is_force_delete
-    max_notes_count = options.max_notes_count
+    max_notes_count = int(options.max_notes_count)
 
     if token is None:
         logging.error('error! token is None')
@@ -51,7 +58,7 @@ def init_output_dir(output_dir, is_force_delete):
         if not is_force_delete and len(os.listdir(output_dir)) > 0:
             raise Exception('%s exists and not exmpty' % output_dir)
 
-    if is_force_delete:
+    if is_force_delete and os.path.exists(output_dir):
         logging.warning('drop dir: %s' % output_dir)
         shutil.rmtree(output_dir)
 
@@ -71,6 +78,13 @@ def download_notes(token, sandbox, china, output_dir, max_notes_count):
     note_metas = download_metadata(note_store, max_notes_count, note_books_map)
     save_notemetas(note_metas, output_dir)
 
+    enex_root = os.path.join(
+        output_dir, 'note-enex',
+    )
+    if not os.path.exists(enex_root):
+        os.makedirs(enex_root)
+
+    download_all_note_enex(note_store, enex_root, note_metas)
     # total_cnt_notebooks = len(note_books)
     # for nb_idx, notebook in enumerate(note_books):
     #     nb_seq = nb_idx + 1
@@ -122,11 +136,11 @@ def download_metadata(note_store, max_count, note_books_map):
                 'tagGuids': note.tagGuids,
                 'notebookGuid': note.notebookGuid,
                 'notebookName': note_books_map[note.notebookGuid],
-                'attr_author': note.attributes.author,
-                'attr_source': note.attributes.source,
-                'attr_sourceURL': note.attributes.sourceURL,
-                'attr_sourceApplication': note.attributes.sourceApplication,
-                'attr_shareDate': note.attributes.shareDate,
+                'attrAuthor': note.attributes.author,
+                'attrSource': note.attributes.source,
+                'attrSourceURL': note.attributes.sourceURL,
+                'attrSourceApplication': note.attributes.sourceApplication,
+                'attrShareDate': note.attributes.shareDate,
                 # 'attributes': note.attributes,
                 # 'largestResourceMime': note.largestResourceMime,
                 # 'largestResourceSize': note.largestResourceSize,
@@ -175,11 +189,11 @@ def save_notemetas(note_metas, output_dir):
         'tagGuids',
         'notebookGuid',
         'notebookName',
-        'attr_author',
-        'attr_source',
-        'attr_sourceURL',
-        'attr_sourceApplication',
-        'attr_shareDate',
+        'attrAuthor',
+        'attrSource',
+        'attrSourceURL',
+        'attrSourceApplication',
+        'attrShareDate',
     ]
 
     with open(fn, 'w') as csvfile:
@@ -189,6 +203,138 @@ def save_notemetas(note_metas, output_dir):
             csvwriter.writerow(record)
 
     logging.info('%s note metas saved in %s' % (len(note_metas), fn))
+
+
+def download_all_note_enex(note_store, enex_root, note_metas):
+    total_cnt = len(note_metas)
+
+    for idx, meta in enumerate(note_metas):
+        title = meta['title']
+        guid = meta['guid']
+        note_dir = os.path.join(
+            enex_root, 'note-%s' % guid)
+
+        text_file = os.path.join(note_dir, enex_file_basename)
+
+        if os.path.exists(text_file):
+            logging.info('(%s/%s) skip download since exists: %s, %s' % (
+                idx + 1, total_cnt, text_file, title))
+            continue
+
+        # download if not exists
+        downloaded = False
+        while not downloaded:
+            try:
+                download_one_note_enex(note_store, note_dir, guid, note_meta=meta)
+            except EDAMSystemException as e:
+                if e.errorCode == EDAMErrorCode.RATE_LIMIT_REACHED:
+                    duration = e.rateLimitDuration
+                    logging.info('Rate limit reacheded, sleep %s seconds and retry' % duration)
+                    time.sleep(duration)
+            else:
+                downloaded = True
+                logging.info('(%s/%s) saved: %s, %s' % (idx + 1, total_cnt, note_dir, title))
+
+
+def download_one_note_enex(note_store, note_dir, note_guid, note_meta):
+    """
+
+    notes:
+
+        save `enex_file_basename` at the end of all,
+        so that we can check this file to know if the cache is good when resume running
+    """
+    note = note_store.getNote(
+        note_guid,
+        True,  # withContent=True,
+        True,  # withResourcesData=True,
+        False,  # withResourcesRecognition=False,
+        False,  # withResourcesAlternateData=False,
+    )
+
+    content = note.content  # string
+    contentHash = note.contentHash  # string
+    contentHashHex = bytes.hex(contentHash)
+    contentLength = note.contentLength  # i32
+    # notebookGuid = note.notebookGuid
+    # tagGuids = note.tagGuids  # list<Guid>
+    tagNames = note.tagNames  # List<string>
+    resources = note.resources  # list<Resource>
+
+    # build metadata structure
+    metadata = copy.deepcopy(note_meta)
+    metadata['contentHashHex'] = contentHashHex
+    metadata['contentLength'] = contentLength
+    # metadata['notebookGuid'] = notebookGuid
+    # metadata['tagGuids'] = tagGuids
+    metadata['tagNames'] = tagNames
+    # metadata['resourcesCount'] = len(resources)
+
+    # save resources
+    note_resource_dir = os.path.join(note_dir, 'resources')
+    if not os.path.exists(note_resource_dir):
+        os.makedirs(note_resource_dir)
+
+    resource_metas = []
+
+    for r in resources or []:
+        r_meta = save_resources(r, note_resource_dir)
+        resource_metas.append(r_meta)
+
+    metadata['resourceMetas'] = resource_metas
+
+    # print(metadata)
+    # save metadata
+    meta_filename = os.path.join(note_dir, 'metadata.json')
+    with open(meta_filename, 'w') as fw:
+        json.dump(metadata, fw, indent=4, ensure_ascii=False)
+
+    # save enex file
+    text_file = os.path.join(note_dir, enex_file_basename)
+    with open(text_file, 'w') as f_enex:
+        f_enex.write(content)
+
+
+def save_resources(resource, note_resource_dir):
+
+    body = resource.data.body
+    bodyHash = resource.data.bodyHash  # bytes
+    bodyHashHex = bytes.hex(bodyHash)
+    bodySize = resource.data.size
+
+    width = resource.width
+    height = resource.height
+    duration = resource.duration
+
+    updateSequenceNum = resource.updateSequenceNum
+
+    mime = resource.mime
+    sourceURL = resource.attributes.sourceURL
+    originalName = resource.attributes.fileName
+    isAttachment = resource.attributes.attachment
+
+    res_meta = {
+        'bodyHashHex': bodyHashHex,
+        'bodySize': bodySize,
+
+        'width': width,
+        'height': height,
+        'duration': duration,
+
+        'updateSequenceNum': updateSequenceNum,
+
+        'mime': mime,
+        'sourceURL': sourceURL,
+        'originalName': originalName,
+        'isAttachment': isAttachment,
+    }
+
+    ext = mimetypes.guess_extension(mime) or '.binary'
+    filename = os.path.join(note_resource_dir, '%s%s' % (bodyHashHex, ext))
+    with open(filename, 'wb') as fw:
+        fw.write(body)
+
+    return res_meta
 
 
 if __name__ == '__main__':
