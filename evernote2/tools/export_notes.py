@@ -54,9 +54,10 @@ def main():
 
 
 def init_output_dir(output_dir, is_force_delete):
-    if os.path.exists(output_dir):
-        if not is_force_delete and len(os.listdir(output_dir)) > 0:
-            raise Exception('%s exists and not exmpty' % output_dir)
+    # do not raise exception if output_dir exists
+    # if os.path.exists(output_dir):
+    #     if not is_force_delete and len(os.listdir(output_dir)) > 0:
+    #         raise Exception('%s exists and not exmpty' % output_dir)
 
     if is_force_delete and os.path.exists(output_dir):
         logging.warning('drop dir: %s' % output_dir)
