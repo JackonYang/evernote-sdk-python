@@ -16,7 +16,6 @@ from evernote2.edam.error.ttypes import EDAMSystemException, EDAMErrorCode
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s | %(levelname)s | %(message)s")
 
 enex_file_basename = 'index.enex'
 
@@ -30,6 +29,7 @@ def main():
     parser.add_option('-c', '--china', dest='is_china', help='use yinxiang.com instead of evernote.com', action='store_true', default=False)
     parser.add_option('-f', '--force-delete', dest='is_force_delete', help='delete output_dir if exists', action='store_true', default=False)
     parser.add_option('-m', '--max-notes-count', dest='max_notes_count', help='max notes count to download', default='10000')
+    parser.add_option('-v', '--verbose', dest='verbose', help='show verbose logs', action='store_true', default=False)
 
     (options, args) = parser.parse_args()
 
@@ -39,6 +39,14 @@ def main():
     is_china = options.is_china
     is_force_delete = options.is_force_delete
     max_notes_count = int(options.max_notes_count)
+    verbose = options.verbose
+
+    if verbose:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+
+    logging.basicConfig(level=log_level, format="%(asctime)s | %(levelname)s | %(message)s")
 
     if token is None:
         logging.error('error! token is None')
@@ -209,6 +217,8 @@ def save_notemetas(note_metas, output_dir):
 def download_all_note_enex(note_store, enex_root, note_metas):
     total_cnt = len(note_metas)
 
+    new_cnt = 0
+
     for idx, meta in enumerate(note_metas):
         title = meta['title']
         guid = meta['guid']
@@ -218,7 +228,7 @@ def download_all_note_enex(note_store, enex_root, note_metas):
         text_file = os.path.join(note_dir, enex_file_basename)
 
         if os.path.exists(text_file):
-            logging.info('(%s/%s) skip download since exists: %s, %s' % (
+            logging.debug('(%s/%s) skip download since exists: %s, %s' % (
                 idx + 1, total_cnt, text_file, title))
             continue
 
@@ -235,6 +245,10 @@ def download_all_note_enex(note_store, enex_root, note_metas):
             else:
                 downloaded = True
                 logging.info('(%s/%s) saved: %s, %s' % (idx + 1, total_cnt, note_dir, title))
+
+        new_cnt += 1
+
+    logging.info('%s new notes downloaded' % new_cnt)
 
 
 def download_one_note_enex(note_store, note_dir, note_guid, note_meta):
