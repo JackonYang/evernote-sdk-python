@@ -65,8 +65,8 @@ def clean_one_note(input_note_dir, output_note_dir):
     out_file = os.path.join(output_note_dir, 'index.txt')
     with open(out_file, 'w') as fw:
         fw.write(title or '')
-        fw.write("\n")
-        fw.write(source_url or '')
+        # fw.write("\n")
+        # fw.write(source_url or '')
         fw.write("\n")
         fw.write("\n")
         fw.write(content or '')
