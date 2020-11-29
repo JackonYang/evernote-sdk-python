@@ -18,6 +18,7 @@ import logging
 
 
 enex_file_basename = 'index.enex'
+meta_file_basename = 'metadata.json'
 
 
 def main():
@@ -300,7 +301,7 @@ def download_one_note_enex(note_store, note_dir, note_guid, note_meta):
 
     # print(metadata)
     # save metadata
-    meta_filename = os.path.join(note_dir, 'metadata.json')
+    meta_filename = os.path.join(note_dir, meta_file_basename)
     with open(meta_filename, 'w') as fw:
         json.dump(metadata, fw, indent=4, ensure_ascii=False)
 
