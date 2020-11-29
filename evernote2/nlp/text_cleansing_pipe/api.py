@@ -14,7 +14,7 @@ def clean_long_html_for_nlp(text):
     # feed to pipeline steps one by one
     # add more steps if you want
     # text = clean_non_ascii(text)
-    text = clean_text_for_hash(text)
+    text = clean_text_for_hash(text, keep_new_line=True)
 
     return text
 

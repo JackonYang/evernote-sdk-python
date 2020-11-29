@@ -3,6 +3,8 @@ import json
 
 from optparse import OptionParser
 
+from evernote2.nlp.text_cleansing_pipe.api import clean_long_html_for_nlp
+
 import logging
 
 
@@ -54,7 +56,8 @@ def clean_one_note(input_note_dir, output_note_dir):
     title = metadata['title']
     source_url = metadata['attrSourceURL']
 
-    content = 'placeholder'
+    content = clean_long_html_for_nlp(
+        read_note_content(input_note_dir))
 
     if not os.path.exists(output_note_dir):
         os.makedirs(output_note_dir)
@@ -69,6 +72,11 @@ def clean_one_note(input_note_dir, output_note_dir):
         fw.write(content or '')
 
     logging.info('cleansed_file saved: %s' % out_file)
+
+
+def read_note_content(note_dir):
+    with open(os.path.join(note_dir, 'index.enex'), 'r') as fr:
+        return '\n'.join(fr.readlines())
 
 
 if __name__ == '__main__':
