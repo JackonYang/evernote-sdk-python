@@ -3,23 +3,18 @@ Evernote2 -- another Evernote SDK for Python
 
 ## Why Evernote2?
 
-
 the official evernote sdk for python is not that good.
-
 
 evernote2 Features:
 
 1. improved sdk with example code. python 3.x supported
 2. Command Line Tools
 
-  - Backup ALL notes. download all notes content(index.enex), metadata(metadata.json) and resources(images/video)
-
+- Backup ALL notes. download all notes content(index.enex), metadata(metadata.json) and resources(images/video)
 
 ## Quick Start
 
-
 tested in Python 3.7.7
-
 
 #### Install
 
@@ -29,18 +24,15 @@ pypi page: [https://pypi.org/project/evernote2/](https://pypi.org/project/everno
 pip install evernote2
 ```
 
-
 #### SDK API usage
 
 example code: [evernote2/sample](evernote2/sample)
 
-
 ## Command Line Tools
-
 
 #### Backup ALL notes
 
-first,  get a *TEMP* Developer Token from [https://app.yinxiang.com/api/DeveloperToken.action](https://app.yinxiang.com/api/DeveloperToken.action)]
+first,  get a *TEMP* Developer Token from [https://app.yinxiang.com/api/DeveloperToken.action](https://app.yinxiang.com/api/DeveloperToken.action)
 
 then, run
 
