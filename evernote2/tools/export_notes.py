@@ -12,13 +12,14 @@ from optparse import OptionParser
 from evernote2.api.client import EvernoteClient
 from evernote2.edam.notestore.ttypes import NoteFilter, NotesMetadataResultSpec
 from evernote2.edam.type.ttypes import NoteSortOrder
-from evernote2.edam.error.ttypes import EDAMSystemException, EDAMErrorCode
+from evernote2.edam.error.ttypes import EDAMSystemException, EDAMErrorCode, EDAMUserException
 
 import logging
 
 
 enex_file_basename = 'index.enex'
 meta_file_basename = 'metadata.json'
+token_url = 'https://app.yinxiang.com/api/DeveloperToken.action'
 
 
 def main():
@@ -77,8 +78,13 @@ def init_output_dir(output_dir, is_force_delete):
 
 
 def download_notes(token, sandbox, china, output_dir, max_notes_count):
-    client = EvernoteClient(token=token, sandbox=sandbox, china=china)
-    note_store = client.get_note_store()
+    try:
+        client = EvernoteClient(token=token, sandbox=sandbox, china=china)
+        note_store = client.get_note_store()
+    except EDAMUserException:
+        logger.exception('invalid token')
+        logger.info('get a new token from: %s' % token_url)
+        return
 
     note_books = note_store.listNotebooks()
     save_notebooks(note_books, output_dir)
