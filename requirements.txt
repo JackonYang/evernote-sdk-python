@@ -1,2 +1,2 @@
 thrift
-oauth2
+oauthlib
