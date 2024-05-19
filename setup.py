@@ -44,7 +44,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
-packages = find_packages(include=['evernote2.*'])
+packages = ['evernote2'] + find_packages(include=['evernote2.*'])
 requires = read('requirements.txt')
 test_requirements = read('requirements-dev.txt')
 
