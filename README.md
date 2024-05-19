@@ -3,7 +3,7 @@ Evernote2 -- another Evernote SDK for Python
 
 ## Why Evernote2?
 
-the official evernote sdk for python is not that good.
+[The official Evernote SDK for Python](https://github.com/Evernote/evernote-sdk-python3) is not that good - it has bugs.
 
 evernote2 Features:
 
